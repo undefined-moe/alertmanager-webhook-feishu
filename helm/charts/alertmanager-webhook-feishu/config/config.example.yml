@@ -16,6 +16,8 @@ bots:
   app_chat: # 配置 chat_id 即走应用模式（需 app.id/secret），告警恢复时编辑更新已有卡片
     chat_id: oc_xxx
 # 如果启用 mention.emails，需要配置飞书应用的 id/secret，用于获取到 open_id
+# domain 默认飞书 https://open.feishu.cn；Lark 国际版配置 https://open.larksuite.com
 app:
   id: ""
   secret: ""
+  # domain: https://open.larksuite.com

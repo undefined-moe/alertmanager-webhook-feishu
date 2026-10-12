@@ -62,6 +62,7 @@ type fakeTransport struct {
 	mu        sync.Mutex
 	responses []string
 	methods   []string
+	hosts     []string
 	paths     []string
 	bodies    []string
 }
@@ -78,6 +79,7 @@ func (f *fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.methods = append(f.methods, req.Method)
+	f.hosts = append(f.hosts, req.URL.Host)
 	f.paths = append(f.paths, req.URL.Path)
 	f.bodies = append(f.bodies, body)
 	idx := len(f.methods) - 1
@@ -92,7 +94,7 @@ func (f *fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func newFakeBot(ft *fakeTransport) *Bot {
-	sdk := NewSDK("", "")
+	sdk := NewSDK("", "", "")
 	sdk.client = http.Client{Transport: ft}
 	tpl, alertTpl, err := getTemplates(nil)
 	if err != nil {
@@ -194,6 +196,33 @@ func TestSendCard_MergeAndPatchFail(t *testing.T) {
 	require.Equal(t, "PATCH", ft.methods[3])
 	require.Equal(t, "/open-apis/im/v1/messages/om_2", ft.paths[3])
 	require.Equal(t, 0, len(bot.groups))
+}
+
+func TestSendCard_LarkBaseURL(t *testing.T) {
+	ft := &fakeTransport{responses: []string{
+		`{"code":0,"msg":"","tenant_access_token":"t-fake","expire":3600}`, // 获取 token
+		`{"code":0,"msg":"success","data":{"message_id":"om_1"}}`,          // 发送卡片
+	}}
+	sdk := NewSDK("cli_x", "secret", "https://open.larksuite.com")
+	sdk.client = http.Client{Transport: ft}
+	tpl, alertTpl, err := getTemplates(nil)
+	require.Nil(t, err)
+	bot := &Bot{
+		chatID:   "oc_test",
+		sdk:      sdk,
+		tpl:      tpl,
+		alertTpl: alertTpl,
+		groups:   make(map[string]*groupState),
+	}
+
+	msg := newCardMessage("gk1", cardAlert("fp1", "firing"))
+	require.Nil(t, bot.Send(&msg))
+	require.Equal(t, 2, len(ft.hosts))
+	// Lark 域名下 token 与消息接口都走 open.larksuite.com
+	require.Equal(t, "open.larksuite.com", ft.hosts[0])
+	require.Equal(t, "open.larksuite.com", ft.hosts[1])
+	require.Equal(t, "/open-apis/auth/v3/tenant_access_token/internal/", ft.paths[0])
+	require.Equal(t, "/open-apis/im/v1/messages", ft.paths[1])
 }
 
 func TestCardContent(t *testing.T) {

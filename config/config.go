@@ -34,6 +34,8 @@ type Bot struct {
 type App struct {
 	ID     string `yaml:"id"`
 	Secret string `yaml:"secret"`
+	// Domain API 域名，默认 https://open.feishu.cn（飞书），Lark 国际版配置 https://open.larksuite.com
+	Domain string `yaml:"domain"`
 }
 
 type Config struct {

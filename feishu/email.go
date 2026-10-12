@@ -19,7 +19,7 @@ func NewEmailHelper(app *config.App) (*EmailHelper, error) {
 		return nil, errors.New("appID, appSecret required")
 	}
 	return &EmailHelper{
-		sdk:   NewSDK(app.ID, app.Secret),
+		sdk:   NewSDK(app.ID, app.Secret, app.Domain),
 		cache: make(map[string]string),
 	}, nil
 }

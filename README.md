@@ -39,6 +39,19 @@ app:
 - 应用模式下同样支持 mention、自定义模板等功能；`@某人` 语法与自定义机器人一致。
 - 限制：只有应用自己发送的、14 天内的卡片可编辑，超期自动降级为重新发送。
 
+### Lark（国际版）适配
+
+飞书与 Lark 的 API 路径完全一致，仅域名不同。使用 Lark 时配置 `app.domain` 即可：
+
+```yaml
+app:
+  id: cli_xxx
+  secret: xxx
+  domain: https://open.larksuite.com
+```
+
+未配置时默认 `https://open.feishu.cn`（飞书）。自定义机器人 webhook 模式无需配置（webhook URL 本身含域名）。
+
 ## 使用
 
 基于参考配置文件 [config.example.yml](config.example.yml) 调整。运行：

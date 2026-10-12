@@ -8,28 +8,33 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
+
+// DefaultBaseURL 飞书（中国版）API 域名；Lark 国际版为 https://open.larksuite.com
+const DefaultBaseURL = "https://open.feishu.cn"
 
 type Sdk struct {
 	appID     string
 	appSecret string
 	token     string
+	baseURL   string
 	client    http.Client
 }
 
-func NewSDK(appID string, appSecret string) *Sdk {
-	s := &Sdk{
+func NewSDK(appID string, appSecret string, baseURL string) *Sdk {
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+	// token 惰性获取：首次 API 调用时刷新（见 call），成功后定时续期，
+	// 避免启动时网络故障导致构造无限阻塞
+	return &Sdk{
 		appID:     appID,
 		appSecret: appSecret,
+		baseURL:   baseURL,
 		client:    http.Client{},
 	}
-
-	if appID != "" && appSecret != "" {
-		s.refreshToken()
-	}
-
-	return s
 }
 
 type batchGetIDResponse struct {
@@ -50,7 +55,7 @@ type batchGetIDResponse struct {
 }
 
 // BatchGetID https://open.feishu.cn/document/ukTMukTMukTM/uUzMyUjL1MjM14SNzITN
-func (s Sdk) BatchGetID(emails []string) (map[string]string, error) {
+func (s *Sdk) BatchGetID(emails []string) (map[string]string, error) {
 	if len(emails) == 0 {
 		return nil, errors.New("at least 1 email")
 	}
@@ -58,7 +63,7 @@ func (s Sdk) BatchGetID(emails []string) (map[string]string, error) {
 		return nil, errors.New("at most 50 emails")
 	}
 
-	api := "https://open.feishu.cn/open-apis/user/v1/batch_get_id?"
+	api := s.baseURL + "/open-apis/user/v1/batch_get_id?"
 	for _, email := range emails {
 		api += "emails=" + email + "&"
 	}
@@ -98,14 +103,14 @@ type sendCardResponse struct {
 
 // SendMessage 以应用身份发送卡片消息到群聊，返回 message_id
 // https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
-func (s Sdk) SendMessage(chatID string, content string) (string, error) {
+func (s *Sdk) SendMessage(chatID string, content string) (string, error) {
 	request := sendCardRequest{
 		ReceiveID: chatID,
 		MsgType:   "interactive",
 		Content:   content,
 	}
 	var response sendCardResponse
-	err := s.post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id", s.token, request, &response)
+	err := s.post(s.baseURL+"/open-apis/im/v1/messages?receive_id_type=chat_id", s.token, request, &response)
 	if err != nil {
 		return "", err
 	}
@@ -118,10 +123,10 @@ func (s Sdk) SendMessage(chatID string, content string) (string, error) {
 // PatchCard 更新应用已发送的卡片消息，要求卡片 config.update_multi 为 true
 // 仅可更新 14 天内发送的消息
 // https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/patch
-func (s Sdk) PatchCard(messageID string, content string) error {
+func (s *Sdk) PatchCard(messageID string, content string) error {
 	request := map[string]string{"content": content}
 	var response sendCardResponse
-	err := s.call("PATCH", "https://open.feishu.cn/open-apis/im/v1/messages/"+messageID, s.token, request, &response)
+	err := s.call("PATCH", s.baseURL+"/open-apis/im/v1/messages/"+messageID, s.token, request, &response)
 	if err != nil {
 		return err
 	}
@@ -144,13 +149,13 @@ type tokenResponse struct {
 }
 
 // TenantAccessToken https://open.feishu.cn/document/ukTMukTMukTM/uIjNz4iM2MjLyYzM
-func (s Sdk) TenantAccessToken() (*tokenResponse, error) {
+func (s *Sdk) TenantAccessToken() (*tokenResponse, error) {
 	request := tokenRequest{
 		AppID:     s.appID,
 		AppSecret: s.appSecret,
 	}
 	var response tokenResponse
-	err := s.post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal/", s.token, request, &response)
+	err := s.post(s.baseURL+"/open-apis/auth/v3/tenant_access_token/internal/", s.token, request, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +189,7 @@ type webhookV2Response struct {
 	Msg           string `json:"msg"`
 }
 
-func (s Sdk) WebhookV2(webhook string, body io.Reader) error {
+func (s *Sdk) WebhookV2(webhook string, body io.Reader) error {
 	logrus.Debug(webhook, body)
 	req, err := http.NewRequest("POST", webhook, body)
 	if err != nil {
@@ -212,16 +217,23 @@ func (s Sdk) WebhookV2(webhook string, body io.Reader) error {
 	return nil
 }
 
-func (s Sdk) get(url string, auth string, responseBody interface{}) error {
+func (s *Sdk) get(url string, auth string, responseBody interface{}) error {
 	return s.call("GET", url, auth, nil, responseBody)
 }
 
-func (s Sdk) post(url string, auth string, requestBody, responseBody interface{}) error {
+func (s *Sdk) post(url string, auth string, requestBody, responseBody interface{}) error {
 	return s.call("POST", url, auth, requestBody, responseBody)
 }
 
-func (s Sdk) call(method string, url string, auth string, requestBody, responseBody interface{}) error {
+func (s *Sdk) call(method string, url string, auth string, requestBody, responseBody interface{}) error {
 	logrus.Debugf("%s %s with %v", method, url, requestBody)
+
+	// token 惰性刷新（跳过 token 接口自身，防递归）；
+	// 并发下的重复刷新只会多请求一次 token 接口，无害
+	if s.appID != "" && s.token == "" && !strings.Contains(url, "tenant_access_token") {
+		s.refreshToken()
+	}
+
 	var body io.Reader
 	if requestBody != nil {
 		bs, err := json.Marshal(requestBody)
@@ -259,11 +271,9 @@ func (s Sdk) call(method string, url string, auth string, requestBody, responseB
 func (s *Sdk) refreshToken() {
 	response, err := s.TenantAccessToken()
 	if err != nil {
+		// 不无限重试：置空 token，下次 API 调用时惰性重试（见 call）
 		logrus.Errorf("refresh token failed, %v", err)
-
-		// sleep and try again
-		time.Sleep(time.Second * 1)
-		s.refreshToken()
+		s.token = ""
 		return
 	}
 	s.token = response.TenantAccessToken

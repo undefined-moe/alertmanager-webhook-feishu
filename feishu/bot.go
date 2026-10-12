@@ -70,9 +70,9 @@ func New(bot *config.Bot, app *config.App, helper *EmailHelper) (*Bot, error) {
 		if app == nil || app.ID == "" || app.Secret == "" {
 			return nil, errors.New("app.id and app.secret are required when bot chat_id is configured")
 		}
-		sdk = NewSDK(app.ID, app.Secret)
+		sdk = NewSDK(app.ID, app.Secret, app.Domain)
 	} else {
-		sdk = NewSDK("", "")
+		sdk = NewSDK("", "", "")
 	}
 
 	return &Bot{
