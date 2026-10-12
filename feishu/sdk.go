@@ -82,6 +82,55 @@ func (s Sdk) BatchGetID(emails []string) (map[string]string, error) {
 	return res, nil
 }
 
+type sendCardRequest struct {
+	ReceiveID string `json:"receive_id"`
+	MsgType   string `json:"msg_type"`
+	Content   string `json:"content"`
+}
+
+type sendCardResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		MessageID string `json:"message_id"`
+	} `json:"data"`
+}
+
+// SendMessage 以应用身份发送卡片消息到群聊，返回 message_id
+// https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
+func (s Sdk) SendMessage(chatID string, content string) (string, error) {
+	request := sendCardRequest{
+		ReceiveID: chatID,
+		MsgType:   "interactive",
+		Content:   content,
+	}
+	var response sendCardResponse
+	err := s.post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id", s.token, request, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.Code != 0 {
+		return "", fmt.Errorf("send message failed, code: %d, err: %s", response.Code, response.Msg)
+	}
+	return response.Data.MessageID, nil
+}
+
+// PatchCard 更新应用已发送的卡片消息，要求卡片 config.update_multi 为 true
+// 仅可更新 14 天内发送的消息
+// https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/patch
+func (s Sdk) PatchCard(messageID string, content string) error {
+	request := map[string]string{"content": content}
+	var response sendCardResponse
+	err := s.call("PATCH", "https://open.feishu.cn/open-apis/im/v1/messages/"+messageID, s.token, request, &response)
+	if err != nil {
+		return err
+	}
+	if response.Code != 0 {
+		return fmt.Errorf("patch card failed, code: %d, err: %s", response.Code, response.Msg)
+	}
+	return nil
+}
+
 type tokenRequest struct {
 	AppID     string `json:"app_id"`
 	AppSecret string `json:"app_secret"`
@@ -115,16 +164,19 @@ func (s Sdk) TenantAccessToken() (*tokenResponse, error) {
 
 // wired response:
 // response of success
-//{
-//    "Extra": null,
-//    "StatusCode": 0,
-//    "StatusMessage": "success"
-//}
+//
+//	{
+//	   "Extra": null,
+//	   "StatusCode": 0,
+//	   "StatusMessage": "success"
+//	}
+//
 // response of failure
-//{
-//    "code": 99991300,
-//    "msg": "invalid request body: not json, invalid character '\\n' in string literal"
-//}
+//
+//	{
+//	   "code": 99991300,
+//	   "msg": "invalid request body: not json, invalid character '\\n' in string literal"
+//	}
 type webhookV2Response struct {
 	StatusCode    int    `json:"StatusCode"`
 	StatusMessage string `json:"StatusMessage"`

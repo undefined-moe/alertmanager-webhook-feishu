@@ -13,6 +13,8 @@ bots:
     url: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
     mention:
       emails: [ "john.xu@example.com" ]
+  app_chat: # 配置 chat_id 即走应用模式（需 app.id/secret），告警恢复时编辑更新已有卡片
+    chat_id: oc_xxx
 # 如果启用 mention.emails，需要配置飞书应用的 id/secret，用于获取到 open_id
 app:
   id: ""

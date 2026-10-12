@@ -21,7 +21,10 @@ type Template struct {
 
 type Bot struct {
 	// Bot Webhook URL
-	Webhook     string            `yaml:"url"`
+	Webhook string `yaml:"url"`
+	// ChatID 应用机器人所在群的 chat_id，配置后以应用身份（app.id/secret）发送，
+	// 支持 resolved 时编辑更新已有卡片
+	ChatID      string            `yaml:"chat_id"`
 	Mention     *Mention          `yaml:"mention"`
 	Template    *Template         `yaml:"template"`
 	TitlePrefix string            `yaml:"title_prefix"`

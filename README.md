@@ -13,6 +13,32 @@
 3. 自定义机器人发送的消息卡片，只支持跳转链接的交互方式，无法发送包含回传交互元素的消息卡片，不能通过消息卡片进行信息收集。
 4. 在消息卡片中如果要@提到某用户，请注意：自定义机器人仅支持通过 open_id 的方式实现，暂不支持email、user_id等其他方式。
 
+## 应用机器人（chat_id 模式，支持编辑消息）
+
+自定义机器人只能单向发消息。若需要**告警恢复时直接编辑更新已有卡片**（而不是再发一条），请使用应用机器人：
+
+1. 在[飞书开放平台](https://open.feishu.cn/app)创建应用，开启**机器人**能力，申请权限：`im:message`（或 `im:message:send_as_bot` + `im:message:update`）。
+2. 将机器人添加到目标群。
+3. 获取群 chat_id：将机器人拉进群后，可通过[查询机器人所在群列表](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/list) API 获取 `oc_` 开头的 chat_id。
+4. 配置 bot 的 `chat_id`（替代 `url`），并配置 `app.id`/`app.secret`：
+
+```yaml
+bots:
+  webhook: # 配置了 chat_id 即走应用模式，无需 url
+    chat_id: oc_xxx
+app:
+  id: cli_xxx
+  secret: xxx
+```
+
+行为说明：
+
+- 同一告警组（GroupKey）只发送一张卡片；后续变化（新增 firing、告警恢复）会**编辑更新原卡片**。
+- 所有告警恢复后，状态清理，下一轮告警发送新卡片。
+- 卡片编辑要求 `config.update_multi=true`，程序会在渲染后自动注入，自定义模板无需修改。
+- 应用模式下同样支持 mention、自定义模板等功能；`@某人` 语法与自定义机器人一致。
+- 限制：只有应用自己发送的、14 天内的卡片可编辑，超期自动降级为重新发送。
+
 ## 使用
 
 基于参考配置文件 [config.example.yml](config.example.yml) 调整。运行：
@@ -63,6 +89,7 @@ Global Flags:
 - [ ] [签名校验](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN#348211be)
 - [ ] 配置可 reload（配置更新，K8s 上可滚动部署，reload 功能不是必须的）
 - [x] 自定义飞书模板
+- [x] 应用机器人模式（chat_id + app.id/secret），告警恢复时编辑更新已有卡片
 - [x] @所有人 支持
 - [x] @某人 支持 open_id
 - [x] @某人 支持 email  @20210729 [官方没有直接支持](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN#4996824a) ，我们可以申请一个飞书应用，通过 email 获取 open_id。

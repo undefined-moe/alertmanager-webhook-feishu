@@ -46,7 +46,7 @@ var serverCmd = &cobra.Command{
 		// bots
 		bots := make(map[string]feishu.IBot)
 		for group, botCfg := range cfg.Bots {
-			bot, err := feishu.New(botCfg, emailHelper)
+			bot, err := feishu.New(botCfg, cfg.App, emailHelper)
 			handleErr(err)
 			bots[group] = bot
 			logrus.Infof("bot %s created", group)

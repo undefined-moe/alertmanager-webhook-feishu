@@ -5,6 +5,8 @@ import "github.com/prometheus/alertmanager/template"
 type WebhookMessage struct {
 	// reference: https://prometheus.io/docs/alerting/latest/notifications/
 	template.Data
+	// alertmanager webhook payload 中的 groupKey，template.Data 未包含
+	GroupKey string `json:"groupKey"`
 	// @某人
 	OpenIDs []string
 	// 用于存储 AlertManager webhook 请求带来的数据，比如 query string

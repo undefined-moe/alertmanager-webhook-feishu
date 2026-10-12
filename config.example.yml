@@ -3,6 +3,8 @@ bots:
     url: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
     metadata:
       "链接地址": "https://www.baidu.com"
+  app_chat: # 配置 chat_id 即走应用模式（需 app.id/secret），告警恢复时编辑更新已有卡片
+    chat_id: oc_xxx
   webhook_mention_all: # group 可以理解为飞书机器人+圈人策略+飞书模板的组合
     url: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
     mention:
@@ -20,7 +22,7 @@ bots:
     mention:
       open_ids: [ "ou_70d31b7942cfb673038292e43daaa9c3","ou_177f84317c6ee52630edf335d5f8a6fc","ou_e7f2d4ea0b40a96f22c814574a6a791a" ]
       rotation: "2021-09-27:2w"
-# 如果启用 mention.emails，需要配置飞书应用的 id/secret，用于获取到 open_id
+# 应用模式（bot 配置 chat_id）必须配置；如果启用 mention.emails，也需要配置，用于获取到 open_id
 app:
   id: ""
   secret: ""
